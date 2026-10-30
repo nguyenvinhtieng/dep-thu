@@ -1,0 +1,19 @@
+{
+  "name": "dep-thu",
+  "private": true,
+  "type": "module",
+  "workspaces": ["shared", "server", "client"],
+  "scripts": {
+    "dev": "concurrently -k -n server,client -c yellow,cyan \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build": "tsc -p shared --noEmit && tsc -p server --noEmit && npm run build -w client",
+    "start": "NODE_ENV=production npm start -w server",
+    "test": "vitest run",
+    "bots": "tsx tools/bot.ts"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^3.2.4"
+  }
+}

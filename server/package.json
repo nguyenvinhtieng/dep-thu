@@ -1,0 +1,19 @@
+{
+  "name": "@dep/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.18.10",
+    "@colyseus/schema": "^5.0.8",
+    "@colyseus/uwebsockets-transport": "^0.18.4",
+    "@dep/shared": "*",
+    "uwebsockets-express": "^2.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}
