@@ -2,7 +2,7 @@ import { Client, Room } from '@colyseus/sdk';
 import Phaser from 'phaser';
 import {
   CHARACTERS, ChatMsg, MemberInfo, decodePong, encodePing, isRoomCode, JoinOptions, LobbyMeta, MATCH, MsgBin, NAME, NICK_SUGGESTIONS,
-  Phase, RoomInfo, RoomSettings, sanitizeName, WORLD,
+  NET, Phase, RoomInfo, RoomSettings, sanitizeName, WORLD,
 } from '@dep/shared';
 import { Input, keyName } from './input/input';
 import { NetMatch } from './net/match';
@@ -60,6 +60,8 @@ export class App {
   private lastRttSent = 0;
   private screen: 'name' | 'lobby' | 'room' | 'match' = 'name';
   private leaving = false;
+  private joining = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshRoom: (() => void) | null = null;
   private refreshLobby: (() => void) | null = null;
   private appendChat: ((m: ChatMsg) => void) | null = null;
@@ -106,13 +108,15 @@ export class App {
   // ---------------- Vòng mạng ----------------
 
   private netTick() {
+    if (!this.room?.connection?.isOpen) return;
     const now = performance.now();
     const m = this.match;
     if (m) m.update(now, this.input.buttons());
     else if (this.room && now - this.lastPing > 1000) {
       this.lastPing = now;
       const b = encodePing(now);
-      this.pipeOut.push(() => this.room?.sendBytes(MsgBin.Ping, b));
+      const room = this.room;
+      this.pipeOut.push(() => { if (this.room === room && room.connection.isOpen) room.sendBytes(MsgBin.Ping, b); });
     }
     if (this.room && now - this.lastRttSent > 2000) {
       this.lastRttSent = now;
@@ -150,8 +154,7 @@ export class App {
       h('div', { class: 'hero' },
         h('h1', { class: 'logo' }, h('img', { class: 'brand-mark', src: '/brand/slipper.svg', alt: '', width: 64, height: 64 }), 'DÉP THỦ'),
         h('div', null, h('span', { class: 'sticker' }, 'ĐẤU DÉP 1v1 ONLINE')),
-        h('p', null, 'Tan ca rồi, ra hẻm làm một trận! Gồng, ném, bắt dép — ai trúng 3 phát là gục.'),
-        h('img', { class: 'brand-banner', src: '/brand/banner.png', alt: 'Dép Thủ — cuộc đấu dép vui nhộn trong hẻm Việt Nam', width: 1774, height: 887, fetchpriority: 'high' })),
+        h('p', null, 'Tan ca rồi, ra hẻm làm một trận! Gồng, ném, bắt dép — ai trúng 3 phát là gục.')),
       h('div', { class: 'card' },
         h('h3', null, 'Biệt danh của bạn'),
         h('div', { class: 'row' }, name),
@@ -286,14 +289,16 @@ export class App {
   }
 
   private async quickPlay() {
-    const open = [...this.rooms.values()].filter((r) => r.metadata?.status === 'waiting' && r.metadata.players < r.metadata.maxPlayers);
-    open.sort((a, b) => b.metadata!.players - a.metadata!.players);
-    for (const r of open) {
-      try {
-        return this.enterRoom(await this.client.joinById(r.roomId, this.joinOpts()));
-      } catch { /* phòng vừa đầy → thử phòng khác */ }
-    }
-    this.joinRoom(() => this.client.create('match', this.joinOpts()));
+    return this.joinRoom(async () => {
+      const open = [...this.rooms.values()].filter((r) => r.metadata?.status === 'waiting' && r.metadata.players < r.metadata.maxPlayers);
+      open.sort((a, b) => b.metadata!.players - a.metadata!.players);
+      for (const r of open) {
+        try {
+          return await this.client.joinById(r.roomId, this.joinOpts());
+        } catch { /* phòng vừa đầy → thử phòng khác */ }
+      }
+      return this.client.create('match', this.joinOpts());
+    });
   }
 
   private joinOpts(extra: Partial<JoinOptions> = {}): JoinOptions {
@@ -301,35 +306,61 @@ export class App {
   }
 
   private async joinRoom(fn: () => Promise<Room>) {
+    if (this.joining || this.room) return;
+    this.joining = true;
     try {
       this.enterRoom(await fn());
     } catch (e) {
       toast('Không vào được phòng: ' + errMsg(e));
       if (this.screen !== 'lobby') this.showLobby();
+    } finally {
+      this.joining = false;
     }
   }
 
   // ---------------- Phòng ----------------
 
   private enterRoom(room: Room) {
+    if (this.room === room) return;
+    this.clearReconnectTimer();
+    const previous = this.room;
+    this.room = null;
+    if (previous) {
+      this.endMatch();
+      void previous.leave(true).catch(() => {});
+    }
     this.leaveLobby();
     this.room = room;
     this.info = null;
     this.chatLog = [];
     this.leaving = false;
-    room.onMessage('info', (info: RoomInfo) => this.onInfo(info));
+    room.onMessage('info', (info: RoomInfo) => { if (this.room === room) this.onInfo(info); });
     room.onMessage('chat', (m: ChatMsg) => {
+      if (this.room !== room) return;
       this.chatLog.push(m);
       if (this.chatLog.length > 60) this.chatLog.shift();
       this.appendChat?.(m);
     });
-    room.onMessage('notice', (m: { text: string }) => toast(m.text, 4000));
-    room.onMessage(MsgBin.Snapshot, (b: Uint8Array) => this.pipeIn.push(() => this.onSnapshot(b)));
-    room.onMessage(MsgBin.Pong, (b: Uint8Array) => this.pipeIn.push(() => this.onPong(b)));
-    room.onDrop?.(() => toast('Mất sóng — đang nối lại…', 6000));
-    room.onReconnect?.(() => toast('Đã nối lại.'));
+    room.onMessage('notice', (m: { text: string }) => { if (this.room === room) toast(m.text, 4000); });
+    room.onMessage(MsgBin.Snapshot, (b: Uint8Array) => this.pipeIn.push(() => { if (this.room === room) this.onSnapshot(b); }));
+    room.onMessage(MsgBin.Pong, (b: Uint8Array) => this.pipeIn.push(() => { if (this.room === room) this.onPong(b); }));
+    room.onDrop?.(() => {
+      if (this.room !== room || this.reconnectTimer) return;
+      toast('Mất sóng — đang nối lại…', 6000);
+      this.reconnectTimer = setTimeout(() => {
+        if (this.room !== room) return;
+        toast('Không nối lại được — đã về sảnh.', 4000);
+        this.leaveRoom();
+      }, NET.reconnectSeconds * 1000);
+    });
+    room.onReconnect?.(() => {
+      if (this.room !== room) return;
+      this.clearReconnectTimer();
+      toast('Đã nối lại.');
+    });
     room.onLeave((code: number) => {
       if (this.room !== room) return;
+      this.clearReconnectTimer();
       this.room = null;
       this.endMatch();
       sessionStorage.removeItem(RC_KEY);
@@ -341,9 +372,20 @@ export class App {
   }
 
   private leaveRoom() {
+    const room = this.room;
+    if (!room) return;
     this.leaving = true;
+    this.clearReconnectTimer();
+    this.room = null;
     sessionStorage.removeItem(RC_KEY);
-    void this.room?.leave(true);
+    this.endMatch();
+    void room.leave(true).catch(() => {});
+    void this.showLobby();
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
   }
 
   private me() {
@@ -519,8 +561,8 @@ export class App {
   private startMatch(slot: number) {
     const room = this.room!;
     this.match = new NetMatch({
-      sendInput: (b) => this.pipeOut.push(() => room.sendBytes(MsgBin.Input, b)),
-      sendPing: (b) => this.pipeOut.push(() => room.sendBytes(MsgBin.Ping, b)),
+      sendInput: (b) => this.pipeOut.push(() => { if (this.room === room && room.connection.isOpen) room.sendBytes(MsgBin.Input, b); }),
+      sendPing: (b) => this.pipeOut.push(() => { if (this.room === room && room.connection.isOpen) room.sendBytes(MsgBin.Ping, b); }),
     }, slot);
     this.screen = 'match';
     this.input.clear();

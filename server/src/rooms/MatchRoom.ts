@@ -43,7 +43,6 @@ export class MatchRoom extends Room {
   private rematch = new Set<string>();
   private rematchDeadline = 0;
   private rematchTimer: ReturnType<typeof setTimeout> | null = null;
-  private emptyTimer: ReturnType<typeof setTimeout> | null = null;
   private infoDirty = false;
   private chatCd = new Cooldown(NET.chatMinIntervalMs);
   private lastMeta = '';
@@ -55,7 +54,8 @@ export class MatchRoom extends Room {
     const code = newCode();
     usedCodes.add(code);
     this.roomId = code;
-    this.autoDispose = false;
+    // Colyseus giữ seat khi đang nối lại và tự xoá khi hết client + seat.
+    this.autoDispose = true;
     const name = sanitizeName(options?.name) ?? 'Khách';
     this.settings = this.cleanSettings(options?.settings, {
       name: `Hẻm của ${name}`, mode: '1v1', maxPlayers: 2, winsNeeded: MATCH.defaultWinsNeeded,
@@ -144,7 +144,6 @@ export class MatchRoom extends Room {
   // ---------- thành viên ----------
 
   onJoin(client: Client, options: JoinOptions) {
-    if (this.emptyTimer) { clearTimeout(this.emptyTimer); this.emptyTimer = null; }
     let name = sanitizeName(options?.name);
     if (!name) throw new Error('Biệt danh không hợp lệ');
     const taken = new Set([...this.members.values()].map((m) => m.name));
@@ -203,7 +202,6 @@ export class MatchRoom extends Room {
     usedCodes.delete(this.roomId);
     stats.rooms--;
     if (this.rematchTimer) clearTimeout(this.rematchTimer);
-    if (this.emptyTimer) clearTimeout(this.emptyTimer);
   }
 
   private removeMember(sid: string, timedOut: boolean) {
@@ -228,7 +226,6 @@ export class MatchRoom extends Room {
     }
     if (this.members.size === 0) {
       this.endGame();
-      this.emptyTimer = setTimeout(() => this.disconnect(), NET.emptyRoomDisposeMs);
     }
     this.flushInfo();
   }
