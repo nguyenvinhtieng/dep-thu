@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Predictor } from '../../client/src/net/prediction';
 import {
   Btn, CATCH, createRound, DODGE, Ev, GameState, PICKUP, PLAYER, SimEvent, SLIPPER, SlipperState, step, WORLD, cloneState,
 } from '../src';
@@ -33,7 +34,7 @@ function duel(gap = 300) {
 /** Ném 1 dép từ p0 với số tick gồng cho trước. */
 function throwFrom(s: GameState, chargeTicks: number, out: SimEvent[] = []) {
   run(s, [Btn.Throw, 0], chargeTicks + 1, out);
-  run(s, [0, 0], 1, out);
+  run(s, [0, 0], SLIPPER.windupTicks + 1, out);
   return out;
 }
 
@@ -90,6 +91,74 @@ describe('di chuyển', () => {
 });
 
 describe('ném / bắt / trúng', () => {
+  it('prediction va chạm giống server, replay không sửa snapshot đối thủ', () => {
+    const s = duel(150);
+    s.players[1].prevButtons = Btn.Left;
+    const snapshot = cloneState(s);
+    const before = cloneState(snapshot);
+    const pred = new Predictor();
+    pred.reconcile(snapshot.players[0], 0, false, snapshot.players, 0);
+    for (let i = 0; i < 25; i++) {
+      pred.tick(Btn.Right);
+      run(s, [Btn.Right, Btn.Left]);
+    }
+    expect(pred.p!.x).toBe(s.players[0].x);
+    expect(snapshot).toEqual(before);
+    const x = pred.p!.x;
+    pred.reconcile(snapshot.players[0], 0, false, snapshot.players, 0);
+    expect(pred.p!.x).toBe(x);
+    expect(snapshot).toEqual(before);
+  });
+
+  it('thả ném có lấy đà, khóa hướng và lực; gồng mạnh hồi lâu hơn', () => {
+    const s = duel(600);
+    run(s, [Btn.Throw, 0], 5);
+    const charge = s.players[0].charge;
+    const out = run(s, [0, 0]);
+    expect(s.players[0].ammo).toBe(2);
+    expect(out.some(e => e.type === Ev.Throw)).toBe(false);
+    run(s, [Btn.Left | Btn.Throw, 0], SLIPPER.windupTicks - 1, out);
+    expect(s.players[0].charge).toBe(charge);
+    expect(s.players[0].facing).toBe(1);
+    expect(s.players[0].ammo).toBe(2);
+    run(s, [0, 0], 1, out);
+    expect(out.filter(e => e.type === Ev.Throw)).toHaveLength(1);
+    expect(s.players[0].ammo).toBe(1);
+    const strong = duel(600);
+    throwFrom(strong, SLIPPER.maxChargeTicks);
+    expect(strong.players[0].throwCd).toBeGreaterThan(s.players[0].throwCd);
+  });
+
+  it('đối thủ đứng sát có thời gian nhảy né trong lúc lấy đà', () => {
+    const s = duel(PLAYER.minSpacing);
+    run(s, [Btn.Throw, 0], 2);
+    const out = run(s, [0, Btn.Jump]);
+    run(s, [0, Btn.Jump], 35, out);
+    expect(out.some(e => e.type === Ev.Throw)).toBe(true);
+    expect(out.some(e => e.type === Ev.Hit)).toBe(false);
+  });
+
+  it('chạy đối đầu giữ khoảng cách; gần tường vẫn nằm trong sân', () => {
+    const s = duel(150);
+    run(s, [Btn.Right, Btn.Left], 90);
+    expect(s.players[1].x - s.players[0].x).toBeGreaterThanOrEqual(PLAYER.minSpacing);
+    s.players[0].x = WORLD.wallLeft + PLAYER.w / 2;
+    s.players[1].x = s.players[0].x;
+    run(s, [0, 0]);
+    expect(s.players[0].x).toBeGreaterThanOrEqual(WORLD.wallLeft + PLAYER.w / 2);
+    expect(s.players[1].x - s.players[0].x).toBeGreaterThanOrEqual(PLAYER.minSpacing);
+  });
+
+  it('trúng đòn trong lúc lấy đà hủy ném', () => {
+    const s = duel(600);
+    run(s, [Btn.Throw, 0], 3);
+    run(s, [0, 0]);
+    s.players[0].stun = PLAYER.stunTicks;
+    const out = run(s, [0, 0], SLIPPER.windupTicks + 1);
+    expect(out.some(e => e.type === Ev.Throw)).toBe(false);
+    expect(s.players[0].ammo).toBe(2);
+  });
+
   it('ném ra dép bay, mất 1 dép, lực tăng theo thời gian giữ', () => {
     const a = duel(600);
     throwFrom(a, 2);
@@ -326,7 +395,7 @@ describe('lăn né', () => {
     const s = duel(260);
     s.players[1].facing = -1;
     const out = run(s, [Btn.Throw, 0], 2);
-    run(s, [0, 0], 1, out); // ném
+    run(s, [0, 0], SLIPPER.windupTicks + 1, out); // lấy đà xong, dép vừa bay
     run(s, [0, Btn.Dodge | Btn.Left], 1, out); // né lùi lại
     run(s, [0, 0], 40, out);
     expect(out.some((e) => e.type === Ev.Hit)).toBe(false);

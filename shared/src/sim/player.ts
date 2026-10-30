@@ -23,6 +23,7 @@ export function stepPlayer(p: PlayerState, rawButtons: number, frozen: boolean, 
   out.dodgeStart = false;
   out.pickup = false;
 
+  const winding = p.charge >= 0 && p.throwCd > 0;
   if (p.throwCd > 0) p.throwCd--;
   if (p.catchCd > 0) p.catchCd--;
   if (p.catchWin > 0) p.catchWin--;
@@ -44,11 +45,11 @@ export function stepPlayer(p: PlayerState, rawButtons: number, frozen: boolean, 
   const pressed = b & ~prev;
   const released = prev & ~b;
   // Đang lăn / cúi nhặt: bỏ qua hướng, nhảy, bắt, bắt đầu gồng
-  const busy = p.dodge > 0 || p.pickLock > 0;
+  const busy = p.dodge > 0 || p.pickLock > 0 || winding;
   const dir = busy ? 0 : (b & Btn.Right ? 1 : 0) - (b & Btn.Left ? 1 : 0);
   if (dir !== 0) p.facing = dir as 1 | -1;
 
-  if (p.stun > 0) { p.charge = -1; p.dodge = 0; }
+  if (p.stun > 0 || frozen) { p.charge = -1; p.dodge = 0; }
   if (p.onGround) p.airDodged = false;
 
   // Lăn né: lướt theo hướng đang bấm (không bấm thì hướng đang nhìn), có i-frame
@@ -71,7 +72,7 @@ export function stepPlayer(p: PlayerState, rawButtons: number, frozen: boolean, 
     p.jumpBuffer = 0;
     out.pickup = true;
   }
-  const locked = p.dodge > 0 || p.pickLock > 0;
+  const locked = p.dodge > 0 || p.pickLock > 0 || winding;
 
   // Bắt: không bắt khi đang gồng ném
   if (pressed & Btn.Catch && !locked && p.catchCd === 0 && p.charge < 0) {
@@ -80,14 +81,18 @@ export function stepPlayer(p: PlayerState, rawButtons: number, frozen: boolean, 
     out.catchStart = true;
   }
 
-  // Ném: giữ để gồng, thả để ném. Server tự tính lực theo số tick giữ.
-  if (b & Btn.Throw) {
+  // Thả để lấy đà: giữ nguyên lực/hướng, đối thủ có một nhịp đọc đòn.
+  if (winding) {
+    if (p.throwCd === 0 && p.charge >= 0 && !frozen && p.stun === 0) {
+      out.throwCharge = p.charge;
+      p.throwCd = SLIPPER.throwCooldownTicks + Math.round(SLIPPER.chargedRecoveryTicks * p.charge / SLIPPER.maxChargeTicks);
+      p.charge = -1;
+    }
+  } else if (b & Btn.Throw) {
     if (p.charge >= 0) p.charge = Math.min(p.charge + 1, SLIPPER.maxChargeTicks);
     else if (pressed & Btn.Throw && !locked && p.throwCd === 0 && p.ammo > 0 && p.catchWin === 0) p.charge = 0;
   } else if (released & Btn.Throw && p.charge >= 0) {
-    out.throwCharge = p.charge;
-    p.charge = -1;
-    p.throwCd = SLIPPER.throwCooldownTicks;
+    p.throwCd = SLIPPER.windupTicks;
   }
 
   // Nhảy: jump buffer + coyote time + nhả sớm thì nhảy thấp
@@ -158,4 +163,24 @@ export function catchZone(p: PlayerState) {
   const x0 = p.facing > 0 ? p.x - CATCH.back : p.x - CATCH.reach;
   const x1 = p.facing > 0 ? p.x + CATCH.reach : p.x + CATCH.back;
   return { x0, x1, y0: p.y - CATCH.top, y1: p.y + CATCH.bottom };
+}
+
+/** Va chạm thân người; nhảy qua đầu hoặc lăn vẫn đổi bên được. */
+export function separatePlayers(players: PlayerState[]): void {
+  const lo = WORLD.wallLeft + PLAYER.w / 2;
+  const hi = WORLD.wallRight - PLAYER.w / 2;
+  for (let pass = 0; pass < players.length * 3; pass++) {
+    for (let i = 0; i < players.length; i++) for (let j = i + 1; j < players.length; j++) {
+      const a = players[i], b = players[j];
+      if (!a.active || !b.active || !a.alive || !b.alive || dodging(a) || dodging(b) || Math.abs(a.y - b.y) >= PLAYER.h * 0.75) continue;
+      const left = a.x <= b.x ? a : b;
+      const right = left === a ? b : a;
+      if (right.x - left.x >= PLAYER.minSpacing) continue;
+      const center = Math.max(lo + PLAYER.minSpacing / 2, Math.min(hi - PLAYER.minSpacing / 2, (left.x + right.x) / 2));
+      left.x = q8(center - PLAYER.minSpacing / 2);
+      right.x = q8(center + PLAYER.minSpacing / 2);
+      left.vx = Math.min(0, left.vx);
+      right.vx = Math.max(0, right.vx);
+    }
+  }
 }

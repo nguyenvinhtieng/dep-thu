@@ -90,7 +90,7 @@ export class NetMatch {
 
     const me = this.slot >= 0 ? snap.players[this.slot] : undefined;
     if (me && me.active) {
-      this.pred.reconcile(me, snap.ackSeq, snap.frozen);
+      this.pred.reconcile(me, snap.ackSeq, snap.frozen, snap.players, this.slot);
       this.stats.reconcileErr = this.pred.lastError;
     } else if (this.pred.p) this.pred.reset();
 

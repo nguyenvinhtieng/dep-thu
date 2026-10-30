@@ -1,5 +1,5 @@
 import { DODGE, PLAYER, SLIPPER } from '../config';
-import { catchZone, PlayerStepResult, stepPlayer } from './player';
+import { catchZone, PlayerStepResult, separatePlayers, stepPlayer } from './player';
 import { MoveResult, moveSlipper, segmentAabb } from './slipper';
 import { Btn, dodging, GameState, PlayerState, SlipperObj, SlipperState } from './state';
 
@@ -111,6 +111,8 @@ export function step(s: GameState, inputs: ArrayLike<number>, out: SimEvent[], h
     if (r.catchStart) ev(out, Ev.CatchStart, i, 0, 0, s.players[i].x, s.players[i].y);
     if (r.dodgeStart) ev(out, Ev.DodgeStart, i, 0, 0, s.players[i].x, s.players[i].y);
   }
+
+  if (!s.frozen) separatePlayers(s.players);
 
   // Ném
   for (let i = 0; i < n; i++) {

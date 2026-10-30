@@ -1,4 +1,4 @@
-import { copyPlayer, NET, PlayerState, PlayerStepResult, seqDiff, stepPlayer } from '@dep/shared';
+import { copyPlayer, NET, PlayerState, PlayerStepResult, separatePlayers, seqDiff, stepPlayer } from '@dep/shared';
 
 const MAX_HISTORY = 120;
 
@@ -12,6 +12,9 @@ export class Predictor {
   errY = 0;
   lastError = 0; // px, cho debug
   private hist: { seq: number; b: number }[] = [];
+  private bodies: PlayerState[] = [];
+  private slot = 0;
+  private remoteOut: PlayerStepResult = { jumped: false, catchStart: false, throwCharge: -1, dodgeStart: false, pickup: false };
   private out: PlayerStepResult = { jumped: false, catchStart: false, throwCharge: -1, dodgeStart: false, pickup: false };
 
   /** Chạy một tick cục bộ. Trả kết quả (ném/bắt/nhảy) để phát hiệu ứng tức thì. */
@@ -29,13 +32,15 @@ export class Predictor {
     return this.hist.slice(-n).map((h) => h.b);
   }
 
-  reconcile(server: PlayerState, ackSeq: number, frozen: boolean) {
+  reconcile(server: PlayerState, ackSeq: number, frozen: boolean, players: PlayerState[] = [server], slot = 0) {
     this.frozen = frozen;
     const had = this.p;
     const ox = had ? had.x + this.errX : 0;
     const oy = had ? had.y + this.errY : 0;
     if (!this.p) this.p = { ...server };
     else copyPlayer(this.p, server);
+    this.slot = slot;
+    this.bodies = players.map((p, i) => i === slot ? this.p! : { ...p });
     while (this.hist.length && seqDiff(this.hist[0].seq, ackSeq) <= 0) this.hist.shift();
     for (const h of this.hist) this.run(h.b);
     if (!had) return;
@@ -59,6 +64,7 @@ export class Predictor {
 
   reset() {
     this.p = null;
+    this.bodies = [];
     this.hist.length = 0;
     this.errX = this.errY = 0;
   }
@@ -67,6 +73,12 @@ export class Predictor {
     const p = this.p!;
     const o = this.out;
     stepPlayer(p, b, this.frozen, o);
+    // Replay cả thân đối thủ từ snapshot riêng, tránh rung khi chạy sát nhau.
+    for (let i = 0; i < this.bodies.length; i++) if (i !== this.slot) {
+      const remote = this.bodies[i];
+      stepPlayer(remote, remote.prevButtons, this.frozen, this.remoteOut);
+    }
+    if (!this.frozen) separatePlayers(this.bodies);
     if (o.throwCharge >= 0 && p.ammo > 0) p.ammo--;
   }
 }

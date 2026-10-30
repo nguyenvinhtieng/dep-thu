@@ -9,7 +9,7 @@ import { NetMatch } from './net/match';
 import { parseNetSim, Pipe } from './net/netsim';
 import { MatchScene } from './scenes/MatchScene';
 import { h, hex, mount, toast } from './ui/dom';
-import { helpModal, keysTable, prefs } from './ui/help';
+import { helpModal, prefs } from './ui/help';
 
 interface Listing {
   roomId: string;
@@ -21,9 +21,12 @@ interface Listing {
 const EMOJIS = ['👏', '😂', '😡', '🩴', '👍', 'GG'];
 const ROLES = ['Tay lái đầu hẻm', 'Cao thủ quán bún', 'Nhỏ mà có võ', 'Gừng càng già càng cay', 'Giao dép siêu tốc'];
 
-const art = (id: number) => `/art/character-${id}.svg`;
+const characterArt = (id: number) => h('span', {
+  class: 'character-art', 'aria-hidden': 'true',
+  style: `--art-x:${(id % 3) * 50}%;--art-y:${Math.floor(id / 3) * 100}%;background-image:url("${import.meta.env.BASE_URL}art/alley-cast-v2.png")`,
+});
 const avatar = (id: number, lg = false) =>
-  h('span', { class: 'ava' + (lg ? ' lg' : ''), style: `--c:${hex(CHARACTERS[id]?.color ?? 0x999999)}` }, h('img', { src: art(id), alt: '' }));
+  h('span', { class: 'ava' + (lg ? ' lg' : ''), style: `--c:${hex(CHARACTERS[id]?.color ?? 0x999999)}` }, characterArt(id));
 const RC_KEY = 'dep.rc';
 
 function endpoint() {
@@ -131,7 +134,7 @@ export class App {
     const chars = h('div', { class: 'chars' });
     const drawChars = () => chars.replaceChildren(...CHARACTERS.map((c) => h('button', {
       class: c.id === char ? 'sel' : '', style: `--c:${hex(c.color)}`, 'aria-pressed': c.id === char ? 'true' : 'false', onclick: () => { char = c.id; drawChars(); },
-    }, h('span', { class: 'portrait' }, h('img', { src: art(c.id), alt: '', width: 130, height: 150 })), h('span', { class: 'character-name' }, c.name), h('span', { class: 'character-role' }, ROLES[c.id]))));
+    }, h('span', { class: 'portrait' }, characterArt(c.id)), h('span', { class: 'character-name' }, c.name), h('span', { class: 'character-role' }, ROLES[c.id]))));
     drawChars();
     const err = h('div', { class: 'small', style: 'min-height:20px;margin-top:6px;color:var(--red-d);font-weight:600' });
     const go = () => {
@@ -145,9 +148,10 @@ export class App {
     name.addEventListener('keydown', (e) => e.key === 'Enter' && go());
     mount(this.ui, h('div', { class: 'narrow' },
       h('div', { class: 'hero' },
-        h('h1', { class: 'logo' }, 'DÉP THỦ'),
+        h('h1', { class: 'logo' }, h('img', { class: 'brand-mark', src: '/brand/slipper.svg', alt: '', width: 64, height: 64 }), 'DÉP THỦ'),
         h('div', null, h('span', { class: 'sticker' }, 'ĐẤU DÉP 1v1 ONLINE')),
-        h('p', null, 'Tan ca rồi, ra hẻm làm một trận! Gồng, ném, bắt dép — ai trúng 3 phát là gục.')),
+        h('p', null, 'Tan ca rồi, ra hẻm làm một trận! Gồng, ném, bắt dép — ai trúng 3 phát là gục.'),
+        h('img', { class: 'brand-banner', src: '/brand/banner.png', alt: 'Dép Thủ — cuộc đấu dép vui nhộn trong hẻm Việt Nam', width: 1774, height: 887, fetchpriority: 'high' })),
       h('div', { class: 'card' },
         h('h3', null, 'Biệt danh của bạn'),
         h('div', { class: 'row' }, name),
@@ -217,7 +221,7 @@ export class App {
     const c = CHARACTERS[this.profile.char];
     mount(this.ui, h('div', { class: 'shell' },
       h('div', { class: 'topbar' },
-        h('h1', { class: 'logo sm grow' }, 'DÉP THỦ'),
+        h('h1', { class: 'logo sm grow' }, h('img', { class: 'brand-mark', src: '/brand/slipper.svg', alt: '', width: 36, height: 36 }), 'DÉP THỦ'),
         h('button', { class: 'small', onclick: () => helpModal(this.input) }, '⌨️ Phím'),
         h('div', { class: 'profile' },
           avatar(this.profile.char),
@@ -241,9 +245,8 @@ export class App {
             h('div', { class: 'row' }, roomName),
             h('div', { class: 'row', style: 'margin-top:10px' }, wins, h('label', null, priv, 'Riêng tư'), h('label', null, spec, 'Cho xem')),
             h('button', { class: 'grow', style: 'width:100%;margin-top:14px', onclick: create }, 'Tạo phòng')),
-          h('details', { class: 'card' },
-            h('summary', null, 'Phím điều khiển'),
-            h('div', { style: 'margin-top:10px' }, keysTable(this.input, false)))),
+          h('div', { class: 'card' },
+            h('button', { class: 'ghost', onclick: () => helpModal(this.input) }, '⚙ Cài đặt & phím tắt'))),
       ),
     ));
     this.refreshLobby();
@@ -363,6 +366,7 @@ export class App {
     this.screen = 'room';
     this.setGameVisible(false);
     this.hudbar.classList.remove('on');
+    this.game.scale.refresh();
     const stage = h('div', { class: 'stage' });
     const watchers = h('div');
     const settingsBox = h('div');
@@ -419,7 +423,7 @@ export class App {
           h('div', { class: 'slot-top' },
             h('span', { class: 'tag' }, `P${slot + 1}`, m.sid === info.hostSid ? ' 👑' : ''),
             h('span', { class: 'muted small' }, m.ping ? `${m.ping} ms` : '')),
-          h('div', { class: 'portrait' }, h('img', { src: art(m.char), alt: '' })),
+          h('div', { class: 'portrait' }, characterArt(m.char)),
           h('div', { class: 'slot-name' }, m.name, m.sid === me.sid ? h('span', { class: 'muted', style: 'font-size:14px' }, ' (bạn)') : ''),
           h('div', { class: 'muted small' }, c.name),
           h('div', { style: 'margin-top:6px' }, !m.connected ? h('span', { class: 'tag bad' }, '📶 Mất sóng') : m.ready ? h('span', { class: 'tag ok' }, '✓ Sẵn sàng') : h('span', { class: 'tag' }, 'Chưa sẵn sàng')),
@@ -466,7 +470,7 @@ export class App {
           h('div', { class: 'mini-chars' }, ...CHARACTERS.map((c) => h('button', {
             class: c.id === me.char ? 'sel' : '', style: `--c:${hex(c.color)}`, title: c.name, 'aria-label': c.name, 'aria-pressed': c.id === me.char ? 'true' : 'false',
             disabled: !waiting, onclick: () => pickChar(c.id),
-          }, h('img', { src: art(c.id), alt: '' }))))),
+          }, characterArt(c.id))))),
       );
     };
 
@@ -474,16 +478,13 @@ export class App {
       h('div', { class: 'topbar', style: 'margin:0' },
         h('button', { class: 'small', onclick: () => this.leaveRoom() }, '← Rời phòng'),
         h('span', { class: 'grow' }),
-        h('h1', { class: 'logo sm' }, 'DÉP THỦ')),
+        h('h1', { class: 'logo sm' }, h('img', { class: 'brand-mark', src: '/brand/slipper.svg', alt: '', width: 36, height: 36 }), 'DÉP THỦ')),
       h('div', { class: 'card' }, head),
       h('div', { class: 'cols' },
         h('div', { class: 'stack' },
           stage,
           h('div', { class: 'card' }, actions, settingsBox, watchers,
-            h('details', { style: 'margin-top:20px' },
-              h('summary', null, 'Phím điều khiển'),
-              h('div', { style: 'margin-top:8px' }, keysTable(this.input, true)),
-              h('div', { class: 'muted small', style: 'margin-top:6px' }, 'Bấm vào ô phím để đổi. Giữ ném để gồng, thả để ném; bắt đúng lúc để cướp dép.')))),
+            h('button', { class: 'ghost', style: 'margin-top:16px', onclick: () => helpModal(this.input) }, '⚙ Cài đặt & phím tắt'))),
         h('div', { class: 'card chat' },
           h('h3', null, 'Trò chuyện'),
           log,
@@ -555,26 +556,35 @@ export class App {
     this.scene?.bind(null);
     this.hideResult();
     this.hudbar.classList.remove('on');
+    this.game.scale.refresh();
     this.ui.classList.remove('hidden', 'over-game');
   }
 
   private showHudbar() {
-    const send = (t: string) => this.room?.send('chat', { text: t, emoji: true });
-    const feed = h('div', { style: 'position:fixed;right:12px;bottom:64px;max-width:300px;text-align:right;font-size:14px;pointer-events:none' });
-    this.appendChat = (m) => {
-      const line = h('div', { class: 'feed-line' }, h('b', null, m.from + ': '), m.text);
-      const wrap = h('div', null, line);
-      feed.append(wrap);
-      setTimeout(() => wrap.remove(), 6000);
+    this.appendChat = () => {};
+    const menu = h('details', { class: 'match-menu' });
+    const settings = () => {
+      menu.removeAttribute('open');
+      this.input.clear();
+      this.input.enabled = false;
+      helpModal(this.input, () => {
+        this.input.clear();
+        this.input.enabled = this.screen === 'match' && (this.match?.slot ?? -1) >= 0;
+      });
     };
+    menu.append(
+      h('summary', { 'aria-label': 'Menu trận đấu' }, '☰ Menu'),
+      h('div', { class: 'match-menu-panel' },
+        h('button', { onclick: settings }, '⚙ Cài đặt & phím tắt'),
+        h('button', { onclick: () => this.leaveRoom() }, '← Rời trận'),
+      ),
+    );
     mount(this.hudbar,
-      ...EMOJIS.map((e) => h('button', { onclick: (ev: Event) => { send(e); (ev.currentTarget as HTMLElement).blur(); } }, e)),
-      h('span', { class: 'sep' }),
-      h('button', { title: 'Phím & cài đặt', 'aria-label': 'Phím & cài đặt', onclick: (ev: Event) => { (ev.currentTarget as HTMLElement).blur(); this.input.enabled = false; helpModal(this.input, () => { this.input.enabled = (this.match?.slot ?? -1) >= 0; }); } }, '⌨️'),
-      h('button', { style: 'font-size:14px', onclick: () => this.leaveRoom() }, 'Rời trận'),
-      feed,
+      h('span', { class: 'match-hint' }, 'Giữ khoảng cách · Canh nhịp ném · Lăn né phản công'),
+      menu,
     );
     this.hudbar.classList.add('on');
+    this.game.scale.refresh();
   }
 
   private showResult() {

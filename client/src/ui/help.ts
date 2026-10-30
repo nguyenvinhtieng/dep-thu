@@ -43,12 +43,13 @@ export function helpModal(input: Input, onClose?: () => void) {
   const close = () => { modal.remove(); onClose?.(); };
   const shake = h('input', { type: 'checkbox', checked: prefs.shake, onchange: (e: Event) => prefs.shake = (e.target as HTMLInputElement).checked });
   const mute = h('input', { type: 'checkbox', checked: sfx.muted, onchange: (e: Event) => sfx.setMuted((e.target as HTMLInputElement).checked) });
-  const box = h('div', { class: 'card narrow' },
-    h('h2', null, 'Cách chơi'),
-    h('p', { class: 'sub' }, 'Mỗi người 2 chiếc dép. Giữ nút ném để gồng, thả để ném. Bắt đúng lúc dép bay tới để cướp dép. Dép rơi dưới đất phải đứng gần và bấm Nhặt (cúi mất một nhịp). Lăn né có i-frame: né sát dép thì hồi chiêu gần như ngay. Trúng 3 lần là gục.'),
-    keysTable(input, true),
+  let table = keysTable(input, true);
+  const box = h('div', { class: 'card narrow', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Cài đặt & phím tắt' },
+    h('h2', null, 'Cài đặt & phím tắt'),
+    h('p', { class: 'sub' }, 'Mỗi người 2 chiếc dép. Giữ nút ném để gồng. Thả nút sẽ lấy đà một nhịp rồi mới ra dép, khóa hướng ném; gồng càng mạnh, hồi càng lâu. Giữ khoảng cách để canh né, nhảy hoặc lăn để đổi bên. Bắt đúng lúc dép bay tới để cướp dép. Dép rơi dưới đất phải đứng gần và bấm Nhặt (cúi mất một nhịp). Lăn né có i-frame: né sát dép thì hồi chiêu gần như ngay. Trúng 3 lần là gục.'),
+    table,
     h('div', { class: 'row', style: 'margin-top:12px' },
-      h('button', { class: 'small', onclick: () => { input.reset(); close(); helpModal(input, onClose); } }, 'Phím mặc định'),
+      h('button', { class: 'small', onclick: () => { input.reset(); const next = keysTable(input, true); table.replaceWith(next); table = next; } }, 'Phím mặc định'),
       h('label', null, shake, ' Rung màn hình'),
       h('label', null, mute, ' Tắt tiếng'),
       h('span', { class: 'grow' }),

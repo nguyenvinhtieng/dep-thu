@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { DODGE, Ev, MATCH, PLAYER, Phase, SLIPPER, SlipperState, TICK_HZ, WORLD } from '@dep/shared';
 import { sfx } from '../audio';
+import { Artwork } from '../render/artwork';
 import type { FxEvent, MatchView, NetMatch } from '../net/match';
-import { charColor, drawAmmo, drawBackground, drawCooldownRing, drawHeart, drawPlayer, drawSlipper, GOLD, INK, paperCard, PAPER, pill } from '../render/draw';
+import { charColor, drawAmmo, drawBackground, drawPlatforms, drawCooldownRing, drawPlayer, drawSlipper, GOLD, INK, PAPER, pill } from '../render/draw';
 
 /** Những gì scene cần từ app (tên, nhân vật theo slot...). */
 export interface MatchBinding {
@@ -22,6 +23,7 @@ const PAPER_CSS = '#fffaf0';
 export class MatchScene extends Phaser.Scene {
   private b: MatchBinding | null = null;
   private g!: Phaser.GameObjects.Graphics;
+  private artwork!: Artwork;
   private hud!: Phaser.GameObjects.Graphics;
   private nameTexts: Phaser.GameObjects.Text[] = [];
   private hudTexts: Phaser.GameObjects.Text[] = [];
@@ -35,6 +37,7 @@ export class MatchScene extends Phaser.Scene {
   private lastPhase = -1;
   private goUntil = 0;
   private fps = 60;
+  private footsteps = new Map<number, { grounded: boolean; nextDust: number }>();
 
   constructor() {
     super('match');
@@ -46,11 +49,27 @@ export class MatchScene extends Phaser.Scene {
     if (b) b.match.onFx = (e) => this.onFx(e);
   }
 
+  preload() {
+    Artwork.preload(this);
+    this.load.image('alley-background-v2', `${import.meta.env.BASE_URL}art/alley-background-v2.png`);
+  }
+
   create() {
-    drawBackground(this.add.graphics());
+    this.footsteps.clear();
+    this.artwork = new Artwork(this);
+    if (this.textures.exists('alley-background-v2')) {
+      this.add.image(0, 0, 'alley-background-v2').setOrigin(0).setDisplaySize(WORLD.width, WORLD.height);
+      // Align the near pavement edge with the physical floor; keep the arena readable.
+      this.add.rectangle(WORLD.width / 2, (WORLD.floorY + WORLD.height) / 2,
+        WORLD.width, WORLD.height - WORLD.floorY, 0xe9ba7d, 0.22);
+      if (!this.artwork.propsReady) drawPlatforms(this.add.graphics());
+    } else {
+      drawBackground(this.add.graphics());
+    }
+    if (this.artwork.propsReady) this.artwork.environment();
     this.add.text(263, 499, 'QUÁN CÔ BA', { fontFamily: FONT, fontSize: '17px', fontStyle: '800', color: '#fff0c9', backgroundColor: '#337665', padding: { x: 14, y: 4 } }).setOrigin(0.5);
-    this.add.text(640, 552, 'TRÀ ĐÁ · 3K', { fontFamily: FONT, fontSize: '16px', fontStyle: '800', color: '#99533e' }).setOrigin(0.5);
-    this.add.text(1010, 559, 'HẺM 1986', { fontFamily: FONT, fontSize: '17px', fontStyle: '800', color: '#99533e' }).setOrigin(0.5);
+    this.add.text(640, this.artwork.propsReady ? 440 : 552, 'TRÀ ĐÁ · 3K', { fontFamily: FONT, fontSize: '16px', fontStyle: '800', color: this.artwork.propsReady ? '#fff0c9' : '#99533e' }).setOrigin(0.5);
+    this.add.text(1010, this.artwork.propsReady ? 605 : 559, 'HẺM 1986', { fontFamily: FONT, fontSize: '17px', fontStyle: '800', color: this.artwork.propsReady ? '#fff0c9' : '#99533e' }).setOrigin(0.5);
     this.g = this.add.graphics();
     this.hud = this.add.graphics().setDepth(10);
     const st = (size: number, color = INK_CSS, weight = '700'): Phaser.Types.GameObjects.Text.TextStyle => ({
@@ -85,11 +104,14 @@ export class MatchScene extends Phaser.Scene {
     this.fps += (1000 / Math.max(delta, 1) - this.fps) * 0.05;
     const g = this.g;
     g.clear();
+    this.artwork.begin();
     this.hud.clear();
     const b = this.b;
     const now = performance.now();
     const v = b?.match.view(now) ?? null;
     if (!b || !v) {
+      this.artwork.end();
+      this.footsteps.clear();
       for (const t of [...this.nameTexts, ...this.hudTexts]) t.setText('');
       this.big.setText(b ? 'Đang nối mạng…' : '');
       this.small.setText('');
@@ -100,10 +122,28 @@ export class MatchScene extends Phaser.Scene {
     const names = b.names();
     const chars = b.chars();
 
-    for (const s of v.slippers) drawSlipper(g, s, chars[s.owner] ?? 0, this.debug, now);
-    v.players.forEach((p, i) => {
-      if (p.active) drawPlayer(g, p, chars[i] ?? i, now, this.debug);
+    const painted = this.artwork.ready;
+    v.slippers.forEach((s, i) => {
+      drawSlipper(g, s, chars[s.owner] ?? 0, this.debug, now, painted);
+      if (painted) this.artwork.slipper(s, i);
     });
+    v.players.forEach((p, i) => {
+      if (p.active) {
+        drawPlayer(g, p, chars[i] ?? i, now, this.debug, painted);
+        if (painted) this.artwork.player(p, chars[i] ?? i, now);
+      }
+      const previous = this.footsteps.get(i);
+      if (p.active && p.alive && p.onGround) {
+        if (previous && !previous.grounded) this.dust(p.x, p.y);
+        else if (Math.abs(p.vx) > 90 && now >= (previous?.nextDust ?? 0)) {
+          this.dust(p.x - p.facing * 16, p.y, 2);
+          this.footsteps.set(i, { grounded: true, nextDust: now + 150 });
+          return;
+        }
+      }
+      this.footsteps.set(i, { grounded: p.onGround, nextDust: previous?.nextDust ?? 0 });
+    });
+    this.artwork.end();
     this.drawNameTags(v, names);
     this.drawPickupPrompt(v, b);
     this.drawHud(v, names, chars, b);
@@ -158,37 +198,42 @@ export class MatchScene extends Phaser.Scene {
     const active = v.players.filter((p) => p.active);
     const n = active.length;
     const W = WORLD.width;
-    const cw = n <= 2 ? 250 : Math.min(250, (W - 40 - (n - 1) * 10) / n);
-    const ch = 76;
+    const cw = Math.min(280, (W - 48 - Math.max(0, n - 1) * 12) / Math.max(n, 1));
+    const ch = 62;
     active.forEach((p, k) => {
-      const x = n <= 2 ? (k === 0 ? 20 : W - 20 - cw) : 20 + k * (cw + 10);
-      const y = 14;
+      const x = n <= 2 ? (k === 0 ? 24 : W - 24 - cw) : 24 + k * (cw + 12);
+      const y = 16;
       const col = charColor(chars[p.slot] ?? 0);
-      paperCard(h, x, y, cw, ch, 14, p.alive ? PAPER : 0xe9e1d2);
-      // dải màu nhân vật bên trái
-      h.fillStyle(col, 1).fillRoundedRect(x + 3, y + 3, 8, ch - 6, 4);
-      // tên + chấm thắng
+      h.fillStyle(INK, 0.88).fillRoundedRect(x, y, cw, ch, 10);
+      h.fillStyle(col, 1).fillRoundedRect(x, y + 10, 4, ch - 20, 2);
       const t = this.hudTexts[k];
-      const label = `${names[p.slot] ?? '?'}${p.me ? ' (bạn)' : ''}`;
-      t.setPosition(x + 20, y + 5).setText(label);
-      const maxW = cw - 30 - need * 15;
-      if (t.width > maxW) t.setCrop(0, 0, maxW, 40); else t.setCrop();
+      const label = `${names[p.slot] ?? '?'}${p.me ? ' · BẠN' : ''}`;
+      t.setPosition(x + 14, y + 6).setColor(PAPER_CSS).setFontSize(14).setText(label);
+      const maxW = Math.max(20, cw - 30 - need * 12);
+      if (t.width > maxW) t.setCrop(0, 0, maxW, 24); else t.setCrop();
       for (let i = 0; i < need; i++) {
-        const px = x + cw - 16 - (need - 1 - i) * 15;
-        h.fillStyle(i < p.wins ? GOLD : 0xe6dccb, 1).fillCircle(px, y + 18, 5.5);
-        h.lineStyle(1.8, INK, 1).strokeCircle(px, y + 18, 5.5);
+        h.fillStyle(i < p.wins ? GOLD : 0x665e50, 1)
+          .fillCircle(x + cw - 14 - (need - 1 - i) * 12, y + 15, 3.5);
       }
-      // hàng dưới: máu · dép · lăn né
-      const ry = y + 52;
-      for (let i = 0; i < PLAYER.maxHp; i++) drawHeart(h, x + 30 + i * 24, ry - 3, 9, i < p.hp);
-      drawAmmo(h, x + 30 + PLAYER.maxHp * 24 + 14, ry, p.ammo, PLAYER.maxAmmo, col);
+      const healthW = Math.max(36, cw - 128);
+      const gap = 4;
+      const segment = (healthW - (PLAYER.maxHp - 1) * gap) / PLAYER.maxHp;
+      for (let i = 0; i < PLAYER.maxHp; i++) {
+        h.fillStyle(i < p.hp ? (p.me ? 0x79dbb2 : 0xf28b82) : 0x514a42, 1)
+          .fillRoundedRect(x + 14 + i * (segment + gap), y + 36, segment, 10, 3);
+      }
+      const ammoX = x + cw - 86;
+      drawAmmo(h, ammoX, y + 42, p.ammo, PLAYER.maxAmmo, col, this.artwork.ready);
+      if (this.artwork.ready) for (let i = 0; i < p.ammo; i++) {
+        this.artwork.icon(ammoX + i * 30, y + 42);
+      }
       const frac = 1 - p.dodgeCd / DODGE.cooldownTicks;
-      drawCooldownRing(h, x + cw - 24, ry, 12, p.alive ? frac : 0);
+      drawCooldownRing(h, x + cw - 20, y + 41, 10, p.alive ? frac : 0);
     });
     for (let i = n; i < this.hudTexts.length; i++) this.hudTexts[i].setText('');
     const ping = b.match.spectator ? 'đang xem' : `${Math.round(b.match.rtt)} ms`;
     this.top.setText(`HIỆP ${v.round}  ·  chạm ${need}  ·  ${ping}`);
-    const ty = n <= 2 ? 34 : 14 + ch + 26;
+    const ty = n <= 2 ? 38 : 16 + ch + 22;
     pill(h, W / 2, ty - 15, this.top.width + 28, 30, INK, 0.92, false);
     this.top.setPosition(W / 2, ty);
   }
@@ -255,17 +300,18 @@ export class MatchScene extends Phaser.Scene {
     // cú ném/bắt/lăn của mình đã phát lúc dự đoán
     if (!e.local && mine && (e.type === Ev.Throw || e.type === Ev.CatchStart || e.type === Ev.DodgeStart)) return;
     switch (e.type) {
-      case Ev.Throw: sfx.throw(); break;
+      case Ev.Throw: sfx.throw(); this.artwork.throw(e.a); break;
       case Ev.CatchStart: sfx.catchStart(); break;
-      case Ev.Catch: sfx.catch(); this.pop(e.x, e.y - 30, 'BẮT!', '#6cc46a'); break;
+      case Ev.Catch: sfx.catch(); this.burst(e.x, e.y, 0x8ce9be); this.pop(e.x, e.y - 30, 'BẮT!', '#6cc46a'); break;
       case Ev.Hit:
         sfx.hit();
+        this.burst(e.x, e.y, 0xffcd62);
         this.pop(e.x, e.y - 30, 'BỐP!', '#ff6a50');
         if (this.b?.shake() && (mine || m.spectator)) this.cameras.main.shake(140, 0.006);
         break;
       case Ev.DodgeStart: sfx.dodge(); this.dust(e.x, e.y); break;
       case Ev.Dodge: sfx.perfect(); this.pop(e.x, e.y - 60, 'NÉ!', '#7cc3f2'); break;
-      case Ev.Bounce: sfx.bounce(); break;
+      case Ev.Bounce: sfx.bounce(); this.burst(e.x, e.y, 0xffedb7, 0.5); break;
       case Ev.Pickup: sfx.pickup(); break;
       case Ev.Eliminated: sfx.ko(); break;
       case Ev.Land: if (e.a === -2) sfx.jump(); break;
@@ -288,11 +334,26 @@ export class MatchScene extends Phaser.Scene {
     });
   }
 
-  /** Bụi tung lên khi bắt đầu lăn. */
-  private dust(x: number, y: number) {
-    for (let i = 0; i < 5; i++) {
+  /** Short radial streaks and an expanding impact ring. */
+  private burst(x: number, y: number, color: number, strength = 1) {
+    const ring = this.add.circle(x, y, 12, color, 0).setStrokeStyle(4, color).setDepth(5);
+    this.tweens.add({ targets: ring, scale: 3.5 * strength, alpha: 0, duration: 260,
+      ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const ray = this.add.star(x, y, 4, 2, 9, i % 2 ? 0xfffaf0 : color)
+        .setRotation(angle).setDepth(5).setScale(strength);
+      this.tweens.add({ targets: ray, x: x + Math.cos(angle) * 58 * strength,
+        y: y + Math.sin(angle) * 48 * strength, alpha: 0, scale: 0.15,
+        duration: 320, ease: 'Cubic.easeOut', onComplete: () => ray.destroy() });
+    }
+  }
+
+  /** Soft puffs for footsteps, landing and dodge. */
+  private dust(x: number, y: number, count = 5) {
+    for (let i = 0; i < count; i++) {
       const c = this.add.circle(x + Phaser.Math.Between(-14, 14), y - 6, Phaser.Math.Between(6, 10), 0xf3ead8, 0.9)
-        .setStrokeStyle(2, INK, 0.5).setDepth(4);
+        .setDepth(4);
       this.tweens.add({
         targets: c, x: c.x + Phaser.Math.Between(-36, 36), y: y - Phaser.Math.Between(10, 30),
         scale: 1.8, alpha: 0, duration: 380, ease: 'Cubic.easeOut', onComplete: () => c.destroy(),

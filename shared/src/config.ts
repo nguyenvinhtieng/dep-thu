@@ -36,6 +36,7 @@ export const PLAYER = {
   coyoteTicks: msToTicks(80),
   jumpBufferTicks: msToTicks(100),
   chargeMoveMul: 0.6, // tốc độ chạy khi đang gồng ném
+  minSpacing: 96, // px — giữ khoảng trống để đọc đòn và né
   knockbackX: 460, // px/s
   knockbackY: 420, // px/s
   stunTicks: msToTicks(300),
@@ -50,6 +51,8 @@ export const SLIPPER = {
   liftRatio: 0.3, // vy ban đầu = -speed × liftRatio
   maxChargeTicks: msToTicks(750),
   throwCooldownTicks: msToTicks(200),
+  windupTicks: msToTicks(180), // lấy đà sau khi thả; khóa hướng ném
+  chargedRecoveryTicks: msToTicks(300), // hồi thêm theo lực ném
   spawnOffsetX: 26, // px trước mặt
   spawnOffsetY: 50, // px trên chân
   wallRestitution: 0.65,

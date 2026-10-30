@@ -45,6 +45,20 @@ Tuỳ chọn bot: `--server URL`, `--lag ms`, `--jitter ms`, `--loss %`, `--matc
 
 URL client: `?room=CODE` vào thẳng phòng, `?server=URL` đổi server, `?lag=&jitter=&loss=` bật netsim (giả lập trễ hai chiều).
 
+## Deploy Render — depthu.vinhtieng.com
+
+1. Push repo (bao gồm `package-lock.json`, `render.yaml` và `client/public/brand/`) lên GitHub/GitLab/Bitbucket.
+2. Trong Render chọn **New → Blueprint**, kết nối repo, chọn branch cần deploy và tạo Blueprint. Để Root Directory trống (gốc repo).
+3. Render đọc `render.yaml`: Node 22.22.2, region Singapore, cài cả devDependencies để build/chạy `tsx`, build client, rồi chạy server. Không cần nhập biến môi trường hay URL WebSocket thủ công.
+4. Khi service chạy, mở **Settings → Custom Domains** để xem `depthu.vinhtieng.com` đã được Blueprint thêm. Trong DNS của `vinhtieng.com`, tạo **CNAME** tên `depthu`, giá trị là hostname `*.onrender.com` thực tế Render cấp cho service (không có `https://` hay đường dẫn).
+5. Bấm **Verify** cạnh domain trên Render. Render tự cấp HTTPS. Nếu dùng Cloudflare, đặt bản ghi ở **DNS only** khi xác minh; gỡ bản ghi A/AAAA cũ xung đột của riêng subdomain `depthu` nếu có.
+
+Kiểm tra sau deploy: `https://depthu.vinhtieng.com/healthz` trả JSON `{"status":"ok"}`, trang chủ có banner/logo, tạo phòng và dùng tab/trình duyệt khác nhập mã để kiểm tra WebSocket. Ảnh chia sẻ nằm tại `/brand/banner.png`; canonical và OG đã trỏ đúng domain.
+
+Blueprint chọn compute **Free**; bandwidth/build vẫn theo hạn mức tài khoản Render. Free ngủ khi không có traffic nên lượt vào đầu có thể phải chờ; có thể đổi sang gói trả phí trên Render nếu cần luôn sẵn sàng. Giữ **1 instance**: phòng game hiện lưu trong RAM, chưa có Redis/shared presence để chạy nhiều instance. Deploy lại/restart làm mất phòng hiện tại; không cần database cho phiên bản này.
+
+Tham khảo: [Blueprint](https://render.com/docs/blueprint-spec), [custom domain/DNS](https://render.com/docs/custom-domains), [WebSocket](https://render.com/docs/websocket), [giới hạn Free](https://render.com/docs/free).
+
 ## Điều khiển
 
 | Hành động | Phím mặc định |

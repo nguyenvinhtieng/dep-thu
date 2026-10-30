@@ -22,6 +22,10 @@ if (prod) {
     '.png': 'image/png', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.json': 'application/json', '.ico': 'image/x-icon',
   };
   const app = await transport.getExpressApp();
+  app.get('/healthz', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ status: 'ok' });
+  });
   app.use((req: { path?: string; url: string }, res: { setHeader(k: string, v: string): void; statusCode: number; end(b?: unknown): void }, next: () => void) => {
     const path = decodeURIComponent((req.path ?? req.url).split('?')[0]);
     if (path.startsWith('/matchmake')) return next();

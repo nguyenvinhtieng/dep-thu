@@ -4,6 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Dép Thủ</title>
+    <meta name="description" content="Tan ca rồi, ra hẻm làm một trận! Dép Thủ — game đấu dép 1v1 online. Né dép, bắt dép và phản công cùng bạn bè ngay trên trình duyệt." />
+    <meta name="theme-color" content="#13342e" />
+    <link rel="canonical" href="https://depthu.vinhtieng.com/" />
+    <link rel="icon" type="image/svg+xml" href="/brand/slipper.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="vi_VN" />
+    <meta property="og:site_name" content="Dép Thủ" />
+    <meta property="og:title" content="Dép Thủ — Đấu dép 1v1 online" />
+    <meta property="og:description" content="Tan ca rồi, ra hẻm làm một trận! Né dép, bắt dép, phản công — rủ bạn bè vào chơi ngay." />
+    <meta property="og:url" content="https://depthu.vinhtieng.com/" />
+    <meta property="og:image" content="https://depthu.vinhtieng.com/brand/banner.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1774" />
+    <meta property="og:image:height" content="887" />
+    <meta property="og:image:alt" content="Dép Thủ — cuộc đấu dép vui nhộn trong hẻm Việt Nam" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Dép Thủ — Đấu dép 1v1 online" />
+    <meta name="twitter:description" content="Né dép, bắt dép, phản công. Rủ bạn bè vào hẻm làm một trận!" />
+    <meta name="twitter:image" content="https://depthu.vinhtieng.com/brand/banner.png" />
+    <meta name="twitter:image:alt" content="Dép Thủ — cuộc đấu dép vui nhộn trong hẻm Việt Nam" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -52,6 +72,8 @@
       .sticker { display: inline-block; padding: 3px 10px; border: 2px solid var(--ink); border-radius: 8px; background: var(--paper); font: 700 12px/1.4 var(--display); letter-spacing: .6px; color: var(--ink); transform: rotate(-4deg); white-space: nowrap; }
       .hero { text-align: center; margin: 4px 0 26px; color: #f6eedd; }
       .hero p { margin: 14px auto 0; max-width: 520px; color: #f6eeddc0; }
+      .brand-mark { width: .82em; height: .82em; align-self: center; flex-shrink: 0; }
+      .brand-banner { display: block; width: min(100%, 640px); height: auto; margin: 20px auto 0; border: 2.5px solid var(--ink); border-radius: 18px; box-shadow: var(--shadow); }
 
       /* ---- layout ---- */
       .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -95,7 +117,9 @@
       .character-role { display: block; margin-top: 3px; padding: 0 6px; font-size: 11px; line-height: 1.35; font-weight: 500; color: var(--muted); }
 
       /* ---- avatars / chips ---- */
-      .ava { display: inline-grid; place-items: end center; flex: none; width: 38px; height: 38px; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--c) 35%, #fff); border: 2px solid var(--ink); }
+      .character-art { display: block; height: 100%; aspect-ratio: 1; margin: auto; background-repeat: no-repeat; background-size: 300% 200%; background-position: var(--art-x) var(--art-y); }
+      .ava .character-art, .mini-chars .character-art { position: absolute; width: 250%; height: 250%; left: -75%; top: 0; margin: 0; }
+      .ava { position: relative; display: inline-grid; place-items: end center; flex: none; width: 38px; height: 38px; border-radius: 50%; overflow: hidden; background: color-mix(in srgb, var(--c) 35%, #fff); border: 2px solid var(--ink); }
       .ava img { width: 120%; height: 120%; object-fit: cover; object-position: center 18%; }
       .ava.lg { width: 52px; height: 52px; }
       .profile { display: flex; align-items: center; gap: 10px; padding: 5px 6px 5px 5px; background: var(--paper); border: 2px solid var(--ink); border-radius: 99px; box-shadow: 0 4px 0 var(--ink); }
@@ -138,7 +162,7 @@
       .actionbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
       .status { font: 700 15px var(--display); }
       .mini-chars { display: flex; gap: 6px; flex-wrap: wrap; }
-      .mini-chars button { padding: 0; min-height: 0; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; display: grid; place-items: end center; background: color-mix(in srgb, var(--c) 35%, #fff); box-shadow: 0 3px 0 var(--ink); }
+      .mini-chars button { position: relative; padding: 0; min-height: 0; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; display: grid; place-items: end center; background: color-mix(in srgb, var(--c) 35%, #fff); box-shadow: 0 3px 0 var(--ink); }
       .mini-chars button img { width: 120%; height: 120%; object-fit: cover; object-position: center 18%; }
       .mini-chars button.sel { outline: 3px solid var(--red); outline-offset: 2px; }
       details > summary { cursor: pointer; font: 700 14px var(--display); list-style: none; display: flex; align-items: center; gap: 8px; }
@@ -174,12 +198,16 @@
 
       /* ---- overlays ---- */
       .toast { position: fixed; left: 50%; top: 18px; transform: translateX(-50%); background: var(--ink); color: #fff; border: 2px solid var(--ink); border-left: 8px solid var(--yellow); border-radius: 12px; padding: 11px 18px; z-index: 50; max-width: 90vw; font-weight: 600; box-shadow: 0 6px 0 #00000040; }
-      #hudbar { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); display: none; align-items: center; gap: 6px; z-index: 5; max-width: 96vw; padding: 6px; background: var(--ink); border-radius: 16px; box-shadow: 0 6px 0 #00000040; }
+      #hudbar { position: fixed; inset: auto 0 0; height: 52px; display: none; align-items: center; justify-content: space-between; gap: 12px; z-index: 5; padding: 0 16px; background: var(--ink); color: var(--paper); border-top: 1px solid #ffffff25; }
       #hudbar.on { display: flex; }
-      #hudbar button { min-height: 38px; padding: 4px 10px; font-size: 16px; box-shadow: none; border-color: #ffffff30; background: #ffffff14; color: #fff; }
-      #hudbar button:hover { background: #ffffff26; }
-      #hudbar .sep { width: 1px; align-self: stretch; margin: 4px 2px; background: #ffffff30; }
-      .feed-line { display: inline-block; margin-top: 4px; padding: 4px 10px; border-radius: 10px; background: #1e1c1ad0; color: #fff; }
+      body:has(#hudbar.on) #game { bottom: 53px; }
+      .match-hint { font-size: 12px; color: #ffffffa0; }
+      .match-menu { position: relative; margin-left: auto; }
+      .match-menu summary { cursor: pointer; padding: 8px 14px; border: 1px solid #ffffff40; border-radius: 8px; font-weight: 700; list-style: none; }
+      .match-menu summary::-webkit-details-marker { display: none; }
+      .match-menu summary:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+      .match-menu-panel { position: absolute; right: 0; bottom: calc(100% + 12px); display: grid; gap: 8px; width: max-content; padding: 12px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); box-shadow: 0 4px 16px #0005; }
+      .match-menu-panel button { text-align: left; font-size: 14px; }
       .modal { position: fixed; inset: 0; background: #13342ec4; backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 40; padding: 20px; overflow-y: auto; }
       .modal .card { max-height: calc(100dvh - 40px); overflow-y: auto; }
       .modal h2 { margin-bottom: 8px; }

@@ -69,6 +69,10 @@ export function drawBackground(g: G) {
   g.lineBetween(0, 685, W, 685);
   g.fillStyle(0x41695a).fillRect(0, 0, WORLD.wallLeft, H).fillRect(WORLD.wallRight, 0, W - WORLD.wallRight, H);
 
+  drawPlatforms(g);
+}
+
+export function drawPlatforms(g: G) {
   for (const p of WORLD.platforms) drawPlatform(g, p.x, p.y, p.w, p.kind);
 }
 
@@ -165,7 +169,7 @@ function slipperShape(g: G, x: number, y: number, ang: number, color: number, al
   g.restore();
 }
 
-export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, debug: boolean) {
+export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, debug: boolean, artwork = false) {
   const color = charColor(char);
   const mark = CHARACTERS[char]?.mark ?? 'helmet';
   const blink = p.invuln > 0 && Math.floor(time / 80) % 2 === 0;
@@ -178,6 +182,7 @@ export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, de
   if (p.me) g.lineStyle(3, GOLD, 0.95).strokeEllipse(x, y + 2, 58, 15);
 
   if (!p.alive) {
+    if (artwork) return;
     // nằm sấp
     g.fillStyle(INK, 0.5).fillRoundedRect(x - 38, y - 20, 68, 22, 8);
     g.fillStyle(0x8a8378, 0.9).fillRoundedRect(x - 36, y - 18, 64, 18, 6);
@@ -188,6 +193,7 @@ export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, de
 
   // lăn né: cuộn tròn + bóng mờ phía sau
   if (dodging(p)) {
+    if (artwork) return;
     const spin = (time / 45) * f;
     for (let k = 3; k >= 1; k--) {
       g.fillStyle(color, 0.16 * a * (4 - k)).fillCircle(x - f * k * 20, y - 24, 22 - k * 2);
@@ -202,57 +208,60 @@ export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, de
 
   const crouch = p.pickLock > 0 ? 16 : 0;
   const by = y + crouch; // thân/đầu hạ xuống khi cúi
-  const squash = p.onGround ? 0 : -3;
-  // chân
-  g.fillStyle(0x2b2a33, a);
-  const step = p.onGround && !crouch && Math.abs(p.vx) > 40 ? Math.sin(time / 60) * 6 : 0;
-  const legH = Math.max(17 + squash - crouch * 0.6, 6);
-  g.fillRoundedRect(x - 13 + step, y - 8 - legH, 11, legH, 3);
-  g.fillRoundedRect(x + 2 - step, y - 8 - legH, 11, legH, 3);
-  g.fillStyle(SKIN, a).fillRect(x - 12 + step, y - 10, 9, 9).fillRect(x + 3 - step, y - 10, 9, 9);
-  g.fillStyle(0xc99b4b, a).fillRoundedRect(x - 16 + step, y - 4, 17, 6, 3).fillRoundedRect(x + 1 - step, y - 4, 17, 6, 3);
-  // thân
-  g.fillStyle(color, a).fillRoundedRect(x - PLAYER.w / 2, by - 56, PLAYER.w, 36, 8);
-  g.lineStyle(2.5, INK, a).strokeRoundedRect(x - PLAYER.w / 2, by - 56, PLAYER.w, 36, 8);
-  g.lineStyle(2, 0xffffff, 0.6 * a).lineBetween(x - 7, by - 53, x, by - 47).lineBetween(x, by - 47, x + 7, by - 53);
-  g.fillStyle(0xffffff, 0.16 * a).fillRoundedRect(x - 14, by - 44, 7, 17, 3);
-  // tay: gồng thì giơ ra sau, bắt thì đưa ra trước, cúi thì với xuống đất
-  g.fillStyle(SKIN, a);
-  if (crouch) g.fillRoundedRect(x + f * 18 - 4, by - 46, 8, 34, 3);
-  else if (p.charge >= 0) g.fillRect(x - f * 26 - 4, by - 66, 8, 18);
-  else if (p.catchWin > 0) g.fillRect(x + (f > 0 ? 18 : -34), by - 52, 16, 8);
-  else g.fillRect(x + f * 14 - 4, by - 50, 8, 20);
-  // đầu
-  g.fillStyle(0x293b32, a).fillCircle(x, by - 69, 15);
-  g.fillStyle(SKIN, a).fillEllipse(x, by - 65, 27, 28);
-  g.lineStyle(2, INK, 0.8 * a).strokeEllipse(x, by - 65, 27, 28);
-  g.fillStyle(0x293b32, a).slice(x - 2, by - 73, 13, Math.PI, 0, false).fillPath();
-  g.fillStyle(0xd8876d, a * 0.6).fillEllipse(x + f * 9, by - 62, 6, 3);
-  g.lineStyle(1.5, 0x864e39, a).lineBetween(x + f * 4, by - 58, x + f * 9, by - 59);
-  g.fillStyle(0x222222, a).fillCircle(x + f * 6, by - 68, 2.2);
+  if (!artwork) {
+    const squash = p.onGround ? 0 : -3;
+    // chân
+    g.fillStyle(0x2b2a33, a);
+    const step = p.onGround && !crouch && Math.abs(p.vx) > 40 ? Math.sin(time / 60) * 6 : 0;
+    const legH = Math.max(17 + squash - crouch * 0.6, 6);
+    g.fillRoundedRect(x - 13 + step, y - 8 - legH, 11, legH, 3);
+    g.fillRoundedRect(x + 2 - step, y - 8 - legH, 11, legH, 3);
+    g.fillStyle(SKIN, a).fillRect(x - 12 + step, y - 10, 9, 9).fillRect(x + 3 - step, y - 10, 9, 9);
+    g.fillStyle(0xc99b4b, a).fillRoundedRect(x - 16 + step, y - 4, 17, 6, 3).fillRoundedRect(x + 1 - step, y - 4, 17, 6, 3);
+    // thân
+    g.fillStyle(color, a).fillRoundedRect(x - PLAYER.w / 2, by - 56, PLAYER.w, 36, 8);
+    g.lineStyle(2.5, INK, a).strokeRoundedRect(x - PLAYER.w / 2, by - 56, PLAYER.w, 36, 8);
+    g.lineStyle(2, 0xffffff, 0.6 * a).lineBetween(x - 7, by - 53, x, by - 47).lineBetween(x, by - 47, x + 7, by - 53);
+    g.fillStyle(0xffffff, 0.16 * a).fillRoundedRect(x - 14, by - 44, 7, 17, 3);
+    // tay: gồng thì giơ ra sau, bắt thì đưa ra trước, cúi thì với xuống đất
+    g.fillStyle(SKIN, a);
+    if (crouch) g.fillRoundedRect(x + f * 18 - 4, by - 46, 8, 34, 3);
+    else if (p.charge >= 0) g.fillRect(x - f * 26 - 4, by - 66, 8, 18);
+    else if (p.catchWin > 0) g.fillRect(x + (f > 0 ? 18 : -34), by - 52, 16, 8);
+    else g.fillRect(x + f * 14 - 4, by - 50, 8, 20);
+    // đầu
+    g.fillStyle(0x293b32, a).fillCircle(x, by - 69, 15);
+    g.fillStyle(SKIN, a).fillEllipse(x, by - 65, 27, 28);
+    g.lineStyle(2, INK, 0.8 * a).strokeEllipse(x, by - 65, 27, 28);
+    g.fillStyle(0x293b32, a).slice(x - 2, by - 73, 13, Math.PI, 0, false).fillPath();
+    g.fillStyle(0xd8876d, a * 0.6).fillEllipse(x + f * 9, by - 62, 6, 3);
+    g.lineStyle(1.5, 0x864e39, a).lineBetween(x + f * 4, by - 58, x + f * 9, by - 59);
+    g.fillStyle(0x222222, a).fillCircle(x + f * 6, by - 68, 2.2);
 
-  switch (mark) {
-    case 'helmet':
-      g.fillStyle(0xf2d12e, a).slice(x, by - 68, 15, Math.PI, 0, false).fillPath();
-      g.lineStyle(2, INK, 0.8 * a).beginPath(); g.arc(x, by - 68, 15, Math.PI, 0, false); g.strokePath();
-      break;
-    case 'nonla':
-      g.fillStyle(0xe8d9a8, a).fillTriangle(x - 24, by - 70, x + 24, by - 70, x, by - 92);
-      g.lineStyle(2, INK, 0.8 * a).strokeTriangle(x - 24, by - 70, x + 24, by - 70, x, by - 92);
-      break;
-    case 'scarf':
-      g.fillStyle(0xffe066, a).fillRect(x - 14, by - 56, 28, 6);
-      g.fillStyle(0x3a2318, a).fillCircle(x - f * 10, by - 74, 7);
-      break;
-    case 'glasses':
-      g.lineStyle(2, 0x111111, a).strokeCircle(x + f * 4, by - 68, 4).strokeCircle(x + f * 11, by - 68, 3);
-      g.fillStyle(0xdddddd, a).fillRect(x - 12, by - 80, 24, 4);
-      break;
-    case 'box':
-      g.fillStyle(0xc89a5a, a).fillRect(x - f * 34 - 10, by - 62, 20, 22);
-      g.lineStyle(2, INK, 0.8 * a).strokeRect(x - f * 34 - 10, by - 62, 20, 22);
-      g.fillStyle(0x2f8f5b, a).fillRect(x - 13, by - 82, 26, 6);
-      break;
+    switch (mark) {
+      case 'helmet':
+        g.fillStyle(0xf2d12e, a).slice(x, by - 68, 15, Math.PI, 0, false).fillPath();
+        g.lineStyle(2, INK, 0.8 * a).beginPath(); g.arc(x, by - 68, 15, Math.PI, 0, false); g.strokePath();
+        break;
+      case 'nonla':
+        g.fillStyle(0xe8d9a8, a).fillTriangle(x - 24, by - 70, x + 24, by - 70, x, by - 92);
+        g.lineStyle(2, INK, 0.8 * a).strokeTriangle(x - 24, by - 70, x + 24, by - 70, x, by - 92);
+        break;
+      case 'scarf':
+        g.fillStyle(0xffe066, a).fillRect(x - 14, by - 56, 28, 6);
+        g.fillStyle(0x3a2318, a).fillCircle(x - f * 10, by - 74, 7);
+        break;
+      case 'glasses':
+        g.lineStyle(2, 0x111111, a).strokeCircle(x + f * 4, by - 68, 4).strokeCircle(x + f * 11, by - 68, 3);
+        g.fillStyle(0xdddddd, a).fillRect(x - 12, by - 80, 24, 4);
+        break;
+      case 'box':
+        g.fillStyle(0xc89a5a, a).fillRect(x - f * 34 - 10, by - 62, 20, 22);
+        g.lineStyle(2, INK, 0.8 * a).strokeRect(x - f * 34 - 10, by - 62, 20, 22);
+        g.fillStyle(0x2f8f5b, a).fillRect(x - 13, by - 82, 26, 6);
+        break;
+    }
+
   }
 
   // thanh gồng
@@ -285,13 +294,17 @@ export function drawPlayer(g: G, p: RenderPlayer, char: number, time: number, de
   }
 }
 
-export function drawSlipper(g: G, s: RenderSlipper, ownerChar: number, debug: boolean, time = 0) {
+export function drawSlipper(g: G, s: RenderSlipper, ownerChar: number, debug: boolean, time = 0, artwork = false) {
   if (s.state === SlipperState.Held) return;
   const ang = (s.angle / 256) * Math.PI * 2;
   const alpha = s.ghost ? 0.85 : 1;
   if (s.harmful && s.state === SlipperState.Flying) {
-    g.lineStyle(5, 0xffffff, 0.35).lineBetween(s.x, s.y, s.x - s.vx * 0.035, s.y - s.vy * 0.035);
-    g.lineStyle(2, charColor(ownerChar), 0.5).lineBetween(s.x, s.y, s.x - s.vx * 0.05, s.y - s.vy * 0.05);
+    for (let i = artwork ? 0 : 5; i >= 1; i--) {
+      const t = i * 0.012;
+      slipperShape(g, s.x - s.vx * t, s.y - s.vy * t, ang - i * 0.4, charColor(ownerChar), (6 - i) * 0.035, 1 - i * 0.07);
+    }
+    g.lineStyle(7, charColor(ownerChar), 0.14).lineBetween(s.x, s.y, s.x - s.vx * 0.055, s.y - s.vy * 0.055);
+    g.lineStyle(2, 0xfff4ce, 0.75).lineBetween(s.x, s.y, s.x - s.vx * 0.025, s.y - s.vy * 0.025);
   }
   if (s.state === SlipperState.Grounded) {
     // dép nằm đất: quầng sáng nhịp để dễ thấy chỗ nhặt
@@ -299,15 +312,15 @@ export function drawSlipper(g: G, s: RenderSlipper, ownerChar: number, debug: bo
     g.fillStyle(0xfff3c4, 0.25 + 0.25 * k).fillEllipse(s.x, s.y + 4, 56 + 8 * k, 18 + 3 * k);
     g.lineStyle(2, GOLD, 0.4 + 0.4 * k).strokeEllipse(s.x, s.y + 4, 56 + 8 * k, 18 + 3 * k);
   }
-  slipperShape(g, s.x, s.y, ang, charColor(ownerChar), alpha);
+  if (!artwork) slipperShape(g, s.x, s.y, ang, charColor(ownerChar), alpha);
   if (debug) g.lineStyle(1, s.harmful ? 0xff4040 : 0x40ff40).strokeCircle(s.x, s.y, SLIPPER.r);
 }
 
 /** Dép đang cầm trên HUD: có màu = còn, viền đứt = hết. */
-export function drawAmmo(g: G, x: number, y: number, n: number, max: number, color: number) {
+export function drawAmmo(g: G, x: number, y: number, n: number, max: number, color: number, artwork = false) {
   for (let i = 0; i < max; i++) {
     const cx = x + i * 30;
-    if (i < n) slipperShape(g, cx, y, -0.35, color, 1, 0.78);
+    if (i < n) { if (!artwork) slipperShape(g, cx, y, -0.35, color, 1, 0.78); }
     else {
       g.fillStyle(0xe6dccb, 1).fillEllipse(cx, y, 26, 11);
       g.lineStyle(1.5, INK, 0.35).strokeEllipse(cx, y, 26, 11);
