@@ -33,6 +33,7 @@ export class MatchScene extends Phaser.Scene {
   private prompt!: Phaser.GameObjects.Text;
   private dbg!: Phaser.GameObjects.Text;
   private debug = false;
+  private nextDebugUpdate = 0;
   private lastCount = -1;
   private lastPhase = -1;
   private goUntil = 0;
@@ -77,7 +78,7 @@ export class MatchScene extends Phaser.Scene {
     });
     for (let i = 0; i < MATCH.maxPlayers; i++) {
       this.nameTexts.push(this.add.text(0, 0, '', st(14)).setOrigin(0.5, 0.5).setDepth(6));
-      this.hudTexts.push(this.add.text(0, 0, '', st(17, INK_CSS, '800')).setDepth(11));
+      this.hudTexts.push(this.add.text(0, 0, '', st(14, PAPER_CSS, '800')).setDepth(11));
     }
     this.big = this.add.text(WORLD.width / 2, 262, '', { ...st(112, '#f2b33d', '800'), stroke: INK_CSS, strokeThickness: 12 })
       .setShadow(6, 7, INK_CSS, 0, true, false).setOrigin(0.5).setDepth(13);
@@ -93,9 +94,12 @@ export class MatchScene extends Phaser.Scene {
     }
     this.dbg = this.add.text(56, 520, '', { fontFamily: 'ui-monospace, Menlo, monospace', fontSize: '13px', color: '#9ef', backgroundColor: '#000a', padding: { x: 6, y: 4 } })
       .setDepth(20).setVisible(false);
-    this.input.keyboard?.on('keydown-F3', (e: KeyboardEvent) => {
+    this.input.keyboard?.on('keydown-P', (e: KeyboardEvent) => {
+      if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable]')) return;
       e.preventDefault();
       this.debug = !this.debug;
+      this.nextDebugUpdate = 0;
       this.dbg.setVisible(this.debug);
     });
   }
@@ -148,7 +152,10 @@ export class MatchScene extends Phaser.Scene {
     this.drawPickupPrompt(v, b);
     this.drawHud(v, names, chars, b);
     this.drawPhase(v, names, now);
-    if (this.debug) this.drawDebug(b.match, now);
+    if (this.debug && now >= this.nextDebugUpdate) {
+      this.drawDebug(b.match, now);
+      this.nextDebugUpdate = now + 200;
+    }
   }
 
   /** Thẻ tên dạng pill trên đầu; của mình màu vàng + mũi nhọn chỉ xuống. */
@@ -208,7 +215,7 @@ export class MatchScene extends Phaser.Scene {
       h.fillStyle(col, 1).fillRoundedRect(x, y + 10, 4, ch - 20, 2);
       const t = this.hudTexts[k];
       const label = `${names[p.slot] ?? '?'}${p.me ? ' · BẠN' : ''}`;
-      t.setPosition(x + 14, y + 6).setColor(PAPER_CSS).setFontSize(14).setText(label);
+      t.setPosition(x + 14, y + 6).setText(label);
       const maxW = Math.max(20, cw - 30 - need * 12);
       if (t.width > maxW) t.setCrop(0, 0, maxW, 24); else t.setCrop();
       for (let i = 0; i < need; i++) {

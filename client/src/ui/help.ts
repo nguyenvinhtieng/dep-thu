@@ -55,7 +55,7 @@ export function helpModal(input: Input, onClose?: () => void) {
       h('span', { class: 'grow' }),
       h('button', { class: 'primary', onclick: close }, 'Đóng'),
     ),
-    h('p', { class: 'muted', style: 'font-size:13px;margin-bottom:0' }, 'Bấm vào ô phím để đổi (Esc để hủy). F3: bảng thông số mạng.'),
+    h('p', { class: 'muted', style: 'font-size:13px;margin-bottom:0' }, 'Bấm vào ô phím để đổi (Esc để hủy). P: bật/tắt bảng thông số mạng.'),
   );
   const modal = h('div', { class: 'modal', onclick: (e: Event) => e.target === modal && close() }, box);
   document.body.append(modal);
